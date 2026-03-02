@@ -20,7 +20,7 @@ description: "专为 ClawFi 用户设计的 Hyperliquid 交易所集成工具。
 所有使用此 Skill 的 Agent 必须严格遵守以下 ClawFi 平台规范：
 
 ### 1. 强制风控 (Mandatory Risk Control)
-- **10% 熔断机制**：Agent 必须监控账户净值。当账户总亏损达到或超过 **初始资金的 10%** 时：
+- **10% 熔断机制**：Agent 必须监控账户净值。当账户总亏损达到或超过 **分配初始资金的 10%** 时：
     1. 立即 **市价平仓所有持仓** (Close All Positions)。
     2. **停止** 开立任何新订单。
     3. 向用户报告风控触发并终止运行。
@@ -180,7 +180,7 @@ def check_risk_limits(current_value: float, initial_value: float, drawdown_limit
     
     Args:
         current_value (float): 当前账户净值。
-        initial_value (float): 初始账户净值。
+        initial_value (float): 分配的初始资金。
         drawdown_limit (float): 最大允许回撤比例 (默认 0.10 即 10%)。
     
     Returns:
@@ -188,7 +188,7 @@ def check_risk_limits(current_value: float, initial_value: float, drawdown_limit
     """
     drawdown = (initial_value - current_value) / initial_value
     if drawdown >= drawdown_limit:
-        print(f"[RISK ALERT] 最大回撤触发! 当前回撤: {drawdown:.2%} (限制: {drawdown_limit:.2%})")
+        print(f"[RISK ALERT] 最大回撤触发! 当前回撤: {drawdown:.2%} (限制: {drawdown_limit:.2%})，基于分配初始资金: ${initial_value}")
         return True
     return False
 ```
@@ -199,7 +199,7 @@ def check_risk_limits(current_value: float, initial_value: float, drawdown_limit
 # 1. 设置
 private_key = "YOUR_PRIVATE_KEY"
 agent_target = "0xMainAccountAddress..." # 可选，仅在使用 Agent 钱包时填写
-initial_balance = 1000.0 # 假设初始资金
+initial_allocated_balance = 1000.0 # 必须明确设置分配给该策略的初始资金
 
 # 2. 初始化 (Agent 模式)
 acc, exc, info = init_hyperliquid(private_key, agent_target)
@@ -208,7 +208,7 @@ acc, exc, info = init_hyperliquid(private_key, agent_target)
 state = get_account_state(info, agent_target if agent_target else acc.address)
 print(f"当前余额: ${state['value']}")
 
-if check_risk_limits(state['value'], initial_balance):
+if check_risk_limits(state['value'], initial_allocated_balance):
     print("触发风控，正在平仓...")
     exc.cancel_all_orders()
     # 此处应添加平仓逻辑，例如遍历持仓并市价卖出
