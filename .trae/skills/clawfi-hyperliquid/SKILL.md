@@ -13,6 +13,25 @@ description: "专为 ClawFi 用户设计的 Hyperliquid 交易所集成工具。
 2.  **市场数据**：获取用户余额和持仓。
 3.  **交易**：执行市价单、限价单。
 4.  **订单管理**：取消订单。
+5.  **风控管理**：提供基础风控检查逻辑。
+
+## ClawFi 交易规范与风控 (ClawFi Trading Standards & Risk Control)
+
+所有使用此 Skill 的 Agent 必须严格遵守以下 ClawFi 平台规范：
+
+### 1. 强制风控 (Mandatory Risk Control)
+- **10% 熔断机制**：Agent 必须监控账户净值。当账户总亏损达到或超过 **初始资金的 10%** 时：
+    1. 立即 **市价平仓所有持仓** (Close All Positions)。
+    2. **停止** 开立任何新订单。
+    3. 向用户报告风控触发并终止运行。
+
+### 2. 资产安全 (Asset Security)
+- **禁止资产转移**：严禁调用任何提现 (Withdraw) 或转账 (Transfer) 接口将资产转移至非授权地址。**严禁窃取分配资产。**
+- **私钥零泄露**：严禁在对话、日志或任何输出中显示私钥 (Private Key) 或助记词。
+
+### 3. 合规交易 (Compliant Trading)
+- **禁止对敲 (No Wash Trading)**：严禁在同一账户或关联账户之间进行自我成交，制造虚假交易量。
+- **市场操纵**：严禁执行任何旨在操纵市场价格的恶意挂单行为。
 
 ## 依赖 (Dependencies)
 
@@ -152,26 +171,57 @@ def cancel_order(exchange: Exchange, coin: str, oid: int):
     return exchange.cancel(coin, oid)
 ```
 
+### 5. ClawFi 风控检查 (ClawFi Risk Check)
+
+```python
+def check_risk_limits(current_value: float, initial_value: float, drawdown_limit: float = 0.10):
+    """
+    检查是否触发风控熔断。
+    
+    Args:
+        current_value (float): 当前账户净值。
+        initial_value (float): 初始账户净值。
+        drawdown_limit (float): 最大允许回撤比例 (默认 0.10 即 10%)。
+    
+    Returns:
+        bool: True 表示触发熔断 (应立即停止交易)，False 表示安全。
+    """
+    drawdown = (initial_value - current_value) / initial_value
+    if drawdown >= drawdown_limit:
+        print(f"[RISK ALERT] 最大回撤触发! 当前回撤: {drawdown:.2%} (限制: {drawdown_limit:.2%})")
+        return True
+    return False
+```
+
 ## 使用示例 (Usage Example)
 
 ```python
 # 1. 设置
 private_key = "YOUR_PRIVATE_KEY"
 agent_target = "0xMainAccountAddress..." # 可选，仅在使用 Agent 钱包时填写
+initial_balance = 1000.0 # 假设初始资金
 
 # 2. 初始化 (Agent 模式)
 acc, exc, info = init_hyperliquid(private_key, agent_target)
 
-# 2b. 初始化 (Vault 模式)
-# vault_addr = "0xVaultAddress..."
-# acc, exc, info = init_hyperliquid(private_key, vault_addr, is_vault=True)
-
-# 3. 检查状态
+# 3. 检查状态与风控
 state = get_account_state(info, agent_target if agent_target else acc.address)
-print(f"余额: ${state['value']}")
+print(f"当前余额: ${state['value']}")
+
+if check_risk_limits(state['value'], initial_balance):
+    print("触发风控，正在平仓...")
+    exc.cancel_all_orders()
+    # 此处应添加平仓逻辑，例如遍历持仓并市价卖出
+    # market_close_all(exc, state['positions']) 
+    exit("交易终止：触及最大亏损限制。")
 
 # 4. 交易示例
+# ... (常规交易逻辑)
+```
 
+### 6. 使用示例 (Usage Example)
+
+```python
 # A. 市价买入 1 SOL
 print("执行市价单...")
 market_res = place_market_order(exc, "SOL", True, 1.0)
