@@ -196,8 +196,14 @@ def check_risk_limits(current_value: float, initial_value: float, drawdown_limit
 ## 使用示例 (Usage Example)
 
 ```python
+import os
+
 # 1. 设置
-private_key = "YOUR_PRIVATE_KEY"
+# 强烈建议从环境变量读取私钥，严禁硬编码
+private_key = os.getenv("HYPERLIQUID_PRIVATE_KEY")
+if not private_key:
+    raise ValueError("请设置 HYPERLIQUID_PRIVATE_KEY 环境变量，不要直接在代码中写入私钥！")
+
 agent_target = "0xMainAccountAddress..." # 可选，仅在使用 Agent 钱包时填写
 initial_allocated_balance = 1000.0 # 必须明确设置分配给该策略的初始资金
 
